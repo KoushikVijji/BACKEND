@@ -24,7 +24,7 @@ const getAllUser = async(req,res,next) => {
         return res.status(404).json({message: "No Users Found"});
     }
     return res.status(200).json({users});
-}
+};
 
 const signup = async (req, res, next) => {
     const { name, username, birthdate, email, password } = req.body;
@@ -150,7 +150,7 @@ const login = async(req,res) => {
     }
     return res.status(200).json({ message: "Login Successful", user: existingUser });
     
-}
+};
 
 const deleteAccount = async(req,res) => {
     const { email } = req.body;
@@ -167,30 +167,39 @@ const deleteAccount = async(req,res) => {
         console.error('Error deleting user:', error);
         return res.status(500).json({ message: 'Error deleting user' });
     }
-}
+};
 
-const ChangePwd = async(req,res) => {
+const ChangePwd = async (req, res) => {
     const { email, oldpassword, newpassword } = req.body;
-
+  
     try {
-        const userToUpdate = await User.findOne({ email });
-
-        if (!userToUpdate) {
-            return res.status(404).json({ message: 'User not found' });
+      const userToUpdate = await User.findOne({ email });
+  
+      if (!userToUpdate) {
+        return res.status(404).json({ message: 'User not found' });
+      } else {
+        const isOldPasswordCorrect = bcrypt.compareSync(
+          oldpassword,
+          userToUpdate.password
+        );
+  
+        if (isOldPasswordCorrect) {
+          userToUpdate.password = bcrypt.hashSync(newpassword);
+          await userToUpdate.save();
+          return res.status(200).json({ message: 'Password Updated Successfully.' });
         } else {
-            if(userToUpdate.password === bcrypt.hashSync(oldpassword)){
-                userToUpdate.password = bcrypt.hashSync(newpassword);
-                await userToUpdate.save();
-                return res.status(200).json({ message: 'Password Updated Successfully.'});
-            }
-            else {
-                return res.status(403).json({ message: 'Entered Old Password did not match the Old Password in the Database.'});
-            }
+          return res
+            .status(403)
+            .json({
+              message:
+                'Entered Old Password did not match the Old Password in the Database.',
+            });
         }
+      }
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'Error Occurred.' });
     }
-    catch(err) {
-        return res.status(400).json({ message: 'Error Occured.' });
-    }
-}
+};
 
 module.exports = {getAllUser, signup, login, verifyOTP, deleteAccount, ChangePwd};
