@@ -103,9 +103,8 @@ const signup = async (req, res, next) => {
 };
 
 
-const verifyOTP = async (req, res, next) => {
+const verifyOTP = async (req, res) => {
     const { email, otp } = req.body;
-    console.log('Received OTP Verification Request:', { email, otp });
   
     try {
       const user = await User.findOne({ email });
