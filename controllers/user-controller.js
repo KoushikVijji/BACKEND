@@ -38,8 +38,34 @@ const signup = async (req, res, next) => {
     }
 
     if (existingUser) {
-        return res.status(400).json({ message: 'User Already Exists! Try Logging In' });
-    }
+        if(existingUser && !existingUser.isVerified){
+            const otp = otpGenerator.generate(6, { upperCase: false, specialChars: false });
+            existingUser.otp = otp;
+            await existingUser.save();
+            try {
+                const mailOptions = {
+                    from: 'test.backendverify@gmail.com',
+                    to: email,
+                    subject: 'OTP for Email Verification',
+                    text: `Your OTP is: ${otp}`,
+                };
+        
+                transporter.sendMail(mailOptions, (error, info) => {
+                    if (error) {
+                        console.error(error);
+                        return res.status(500).json({ message: 'Error sending email' });
+                    }
+                    return res.status(201).json({ message: 'OTP Sent' });
+                });
+            } catch (err) {
+                console.error(err);
+                return res.status(500).json({ message: 'Error sending OTP' });
+            };
+
+            return res.status(403).json({ message: 'OTP Verification needs to be completed.' });
+        }
+        return res.status(400).json({ message: 'User Already Exists! Try Logging In.' });
+    } 
 
     const hashedPassword = bcrypt.hashSync(password);
     const otp = otpGenerator.generate(6, { upperCase: false, specialChars: false });
@@ -101,7 +127,7 @@ const verifyOTP = async (req, res, next) => {
     }
 };
 
-const login = async(req,res,next) => {
+const login = async(req,res) => {
     const { email,password } = req.body;
     let existingUser;
     try{
@@ -127,4 +153,45 @@ const login = async(req,res,next) => {
     
 }
 
-module.exports = {getAllUser, signup, login, verifyOTP};
+const deleteAccount = async(req,res) => {
+    const { email } = req.body;
+
+    try {
+        const userToDelete = await User.findOneAndDelete({ email });
+
+        if (!userToDelete) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        return res.status(200).json({ message: 'Account deleted successfully', deletedUser: userToDelete });
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        return res.status(500).json({ message: 'Error deleting user' });
+    }
+}
+
+const ChangePwd = async(req,res) => {
+    const { email, oldpassword, newpassword } = req.body;
+
+    try {
+        const userToUpdate = await User.findOne({ email });
+
+        if (!userToUpdate) {
+            return res.status(404).json({ message: 'User not found' });
+        } else {
+            if(userToUpdate.password === bcrypt.hashSync(oldpassword)){
+                userToUpdate.password = bcrypt.hashSync(newpassword);
+                await userToUpdate.save();
+                return res.status(200).json({ message: 'Password Updated Successfully.'});
+            }
+            else {
+                return res.status(403).json({ message: 'Entered Old Password did not match the Old Password in the Database.'});
+            }
+        }
+    }
+    catch(err) {
+        return res.status(400).json({ message: 'Error Occured.' });
+    }
+}
+
+module.exports = {getAllUser, signup, login, verifyOTP, deleteAccount, ChangePwd};
